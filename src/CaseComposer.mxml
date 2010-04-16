@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+				xmlns:components="com.hillelcoren.components.*"
+				layout="absolute"
+				width="500"
+				height="350"
+				showCloseButton="true"
+				title="Composer">
+
+	<mx:Metadata>
+					[Event(name='cancel', type="flash.events.Event")]
+				</mx:Metadata>
+
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+
+			[Bindable]
+			private var _data:ArrayCollection=new ArrayCollection([{type: "one", count: 3}, {type: "two", count: 2}, {type: "three", count: 5}]);
+
+
+			private function onSelectChange(event:Event):void
+			{
+				// dynamic show the form
+				if (autocomplete1.selectedItem != null)
+				{
+					trace(autocomplete1.selectedItem);
+					var temp:Object=autocomplete1.selectedItem as Object
+					var paramList:ArrayCollection=new ArrayCollection()
+					for (var i:int=0; i < temp.count; i++)
+					{
+						paramList.addItem({name: "Param-" + i, value: "--"})
+					}
+					dgParam.dataProvider=paramList
+					dgParam.visible=true
+				}
+				else
+				{
+					dgParam.dataProvider=null
+				}
+
+			}
+
+
+//			public function handleRepeatStart():void
+//			{
+//				mx.controls.Alert.show("Repeater starting!");
+//			}
+//
+//			public function handleRepeat():void
+//			{
+//				trace("Currently on index:" + myRepeater.currentIndex);
+//				trace("Image is:" + myRepeater.currentItem.source);
+//			}
+//
+//			public function handleRepeatEnd():void
+//			{
+//				mx.controls.Alert.show("Repeater finished!");
+//			}
+		]]>
+	</mx:Script>
+
+	<mx:transitions>
+		<mx:Transition>
+			<mx:Parallel target="{button1}">
+				<mx:Move/>
+				<mx:Resize/>
+			</mx:Parallel>
+		</mx:Transition>
+	</mx:transitions>
+	<mx:states>
+		<mx:State name="StateForm">
+			<mx:SetProperty target="{button1}"
+							name="x"
+							value="150"/>
+			<mx:SetProperty target="{button1}"
+							name="y"
+							value="216"/>
+			<mx:SetProperty target="{label1}"
+							name="x"
+							value="27"/>
+			<mx:SetProperty target="{label1}"
+							name="y"
+							value="10"/>
+			<mx:SetProperty target="{autocomplete1}"
+							name="x"
+							value="110"/>
+			<mx:SetProperty target="{autocomplete1}"
+							name="y"
+							value="10"/>
+			<mx:AddChild position="lastChild">
+				<mx:DataGrid x="32"
+							 y="52"
+							 id="dgParam"
+							 editable="true"
+							 doubleClickEnabled="true"
+							 visible="false">
+				</mx:DataGrid>
+			</mx:AddChild>
+			<mx:SetEventHandler name="click"
+								target="{button1}"
+								handler="currentState= ''"/>
+
+		</mx:State>
+	</mx:states>
+
+
+
+
+	<mx:Button x="301"
+			   y="107"
+			   label="Button"
+			   id="button1"
+			   click="currentState='StateForm'"/>
+
+
+
+	<components:AutoComplete dataProvider="{ _data }"
+							 labelField="type"
+							 prompt="Please select"
+							 backspaceAction="remove"
+							 selectedItemStyleName="underline"
+							 change="onSelectChange(event)"
+							 x="118"
+							 y="107"
+							 id="autocomplete1"
+							 width="175"
+							 height="38"/>
+	<mx:Label x="21"
+			  y="109"
+			  text="Input Keyword"
+			  id="label1"/>
+
+
+</mx:TitleWindow>

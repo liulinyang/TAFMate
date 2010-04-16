@@ -1,0 +1,29 @@
+<?xml version='1.0' ?> 
+ <TestCase definedid='Foxhunter-FoxDNS-0020' type='RAT' atp='1'>
+<Title><![CDATA[Polling RBL information from database]]></Title>
+<KeyWord keyname='IMSS7Foxhunter::clearEnv'>
+</KeyWord>
+<KeyWord keyname='IMSS7Foxhunter::setConfigFile'>
+<Para paraname='file'>foxdns.ini</Para>
+<Para paraname='dest'>/opt/trend/imss/config</Para>
+</KeyWord>
+<KeyWord keyname='IMSS7Foxhunter::restartService'>
+</KeyWord>
+<KeyWord keyname='IMSS7Foxhunter::importTableFromCSV'>
+</KeyWord>
+<KeyWord keyname='IMSS7Foxhunter::waitSeconds'>
+<Para paraname='n'>30</Para>
+</KeyWord>
+<KeyWord keyname='IMSS7Foxhunter::verifyDNSZoneFile'>
+<Para paraname='domain'>192.168.11.1</Para>
+<Para paraname='ip'>127.0.2.1</Para>
+</KeyWord>
+<KeyWord keyname='IMSS7Foxhunter::verifyDNSZoneFile'>
+<Para paraname='domain'>192.168.11.2</Para>
+<Para paraname='ip'>127.0.2.2</Para>
+</KeyWord>
+<KeyWord keyname='IMSS7Foxhunter::verifyDNSZoneFile'>
+<Para paraname='domain'>192.168.11.3</Para>
+<Para paraname='ip'>127.0.2.3</Para>
+</KeyWord>
+</TestCase>

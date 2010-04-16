@@ -1,0 +1,2136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:WindowedApplication xmlns:mx="http://www.adobe.com/2006/mxml"
+						xmlns:components="com.hillelcoren.components.*"
+						horizontalAlign="center"
+						layout="vertical"
+						cornerRadius="7"						
+					    width="1100" height="825"					     
+						alpha="0.92" currentState="StateNormal" creationComplete="onInit(event)">
+	<mx:states>
+		<mx:State name="StateNormal">
+			<mx:RemoveChild target="{panelParam}"/>
+			<mx:SetProperty target="{panelStatus}" name="title" value="Status Information:"/>
+			<mx:SetProperty target="{linkbutton1}" name="width" value="32"/>
+			<mx:SetProperty target="{linkbutton2}" name="width" value="32"/>
+			<mx:SetProperty target="{linkbutton3}" name="width" value="32"/>
+		</mx:State>
+	</mx:states>
+	<mx:Script>
+		<![CDATA[
+			import mx.controls.treeClasses.TreeItemRenderer;
+			import mx.messaging.channels.StreamingAMFChannel;
+			import mx.controls.treeClasses.TreeListData;
+			import com.hillelcoren.components.autoComplete.classes.SelectedItem;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.core.DragSource;
+			import mx.core.IUIComponent;
+			import mx.managers.DragManager;
+			import mx.events.DragEvent;
+			import mx.collections.XMLListCollection;
+			import mx.utils.StringUtil;
+			import mx.binding.utils.BindingUtils;
+			import flash.trace.Trace;
+			import mx.collections.ArrayCollection;
+			
+			import flash.events.Event;
+			import flash.net.URLLoader;
+			import flash.net.URLRequest;
+			import flash.desktop.Clipboard;
+			import flash.desktop.ClipboardFormats;
+			
+			
+			import mx.controls.Alert;
+            import mx.rpc.http.HTTPService;
+            import mx.rpc.events.ResultEvent;
+            import mx.rpc.events.FaultEvent;
+            import mx.events.*;
+            import mx.controls.*;
+            
+            import air.update.events.UpdateEvent;
+            import air.update.ApplicationUpdaterUI;
+
+            private const PROJECT_NAME:String = "IMSX7";
+            
+            [Bindable]
+			private var _testRoot:File = new File("C:");
+            
+			[Bindable]
+			private var _data:ArrayCollection=new ArrayCollection(["one", "two", "three"]);
+			
+			 //store autocomplete control
+			[Bindable]
+			private var _myData:ArrayCollection=new ArrayCollection(null);
+
+			[Bindable]
+			public var demo:XML = new XML("<TestCase definedid='Untitiled'/>");
+			
+			[Bindable]
+			private var myCollection:ArrayCollection
+			
+			[Bindable]
+			private var caseList:XML = new XML();
+			
+			[Bindable]
+			private var keywordList:XML = new XML("<root/>");
+			
+			[Bindable]
+			private var myStepComposer:CaseComposer = new CaseComposer()
+			
+			private var preview:previewWindow = new previewWindow();
+			private var newCaseDiag:newTestCaseWindow = new newTestCaseWindow();
+			
+			[Bindable]						
+			private var directory:File = new File("C:\\");
+			
+			[Bindable]						
+			private var caseXMLdirectory:File = new File("C:\\");
+			
+			[Bindable]		
+			private var caseXMLFolder:String = "C:\\";
+			
+			[Bindable]		
+			private var rootFolder:String = "C:";
+			
+			[Bindable]		
+			private var keywordURL:String = "C:\\flex_keyword.xml";
+			
+			[Bindable]		
+			private var caseModified:Boolean= false;
+			
+			private var toBeDeleteID:String = '';
+			
+			[Bindable]
+			private var copyDataAvaliable:Boolean = false;
+			
+			private var service:HTTPService;
+			
+			private var datContent:String; 
+			private var tblContent:String;
+			
+			
+			private var myMenu:Menu;
+			private var mm:ContextMenu = new ContextMenu();
+			
+			private var lastModifiedCase:XML = null
+			private var optionContainer:DisplayObjectContainer = null;
+			private var optionIndex:int;
+
+			/**
+			 * @var the object that that handles the update related actions
+			 */
+			private var appUpdater:ApplicationUpdaterUI=new ApplicationUpdaterUI();
+
+			/**
+			 * This function is triggered when the application finished to load;
+			 * Here we initialize <code>appUpdater</code> and set some properties
+			 */
+			private function checkUpdate():void
+			{
+				setApplicationVersion();
+				// we set the URL for the update.xml file 
+//				appUpdater.updateURL="http://nj-kevin-young9.client.tw.trendnet.org:3000/updater/update.xml";
+//				appUpdater.updateURL="\\\\10.204.16.2\\Home\\IMSS\\Kevin\\Automate\\update.xml";
+				appUpdater.updateURL="http://10.204.168.5:8080/updater/update.xml";
+				//we set the event handlers for INITIALIZED nad ERROR
+				appUpdater.addEventListener(UpdateEvent.INITIALIZED, onUpdate);
+				appUpdater.addEventListener(ErrorEvent.ERROR, onError);
+				//we can hide the dialog asking for permission for checking for a new update;
+				//if you want to see it just leave the default value (or set true).
+				appUpdater.isCheckForUpdateVisible=false;
+				//if isFileUpdateVisible is set to true, File Update, File No Update, 
+				//and File Error dialog boxes will be displayed
+				appUpdater.isFileUpdateVisible=false;
+				//if isInstallUpdateVisible is set to true, the dialog box for installing the update is visible
+				appUpdater.isInstallUpdateVisible=false;
+				//we initialize the updater
+				appUpdater.initialize();
+			}
+
+			/**
+			 * Handler function triggered by the ApplicationUpdater.initialize;
+			 * The updater was initialized and it is ready to take commands
+			 * (such as <code>checkNow()</code>
+			 * @param UpdateEvent
+			 */
+			private function onUpdate(event:UpdateEvent):void
+			{
+//				this.stage.nativeWindow.maximize();
+				//start the process of checking for a new update and to install
+				appUpdater.checkNow();		
+				initContextMenu(mm);	
+			}
+			
+			private function initContextMenu(menu:ContextMenu):void
+			{
+				var menuItems:Array = [];
+				var edit:ContextMenuItem = new ContextMenuItem("Delete");
+				edit.addEventListener(ContextMenuEvent.MENU_ITEM_SELECT, databases_menuItemSelectHandler);
+				menuItems.push(edit);
+				menu.customItems = menuItems;
+			}
+
+			/**
+			 * Handler function for error events triggered by the ApplicationUpdater.initialize
+			 * @param ErrorEvent
+			 */
+			private function onError(event:ErrorEvent):void
+			{
+				Alert.show(event.toString());
+			}
+
+			/**
+			 * A simple code just to read the current version of the application
+			 * and display it in a label.
+			 */
+			private function setApplicationVersion():void
+			{
+				var appXML:XML=NativeApplication.nativeApplication.applicationDescriptor;
+				var ns:Namespace=appXML.namespace();
+				lblAppVersion.text="Version:" + appXML.ns::version;
+			}
+
+            // Initialize the Menu control,
+            // and specify it as the pop up object
+            // of the PopUpButton control.
+            private function initPreviewMenu():void {
+                myMenu = new Menu();
+                var dp:Object = [
+                  {label: "xml"},
+                  {label: "tbl"},
+                  {label: "dat"}
+                ];
+                myMenu.dataProvider = dp;
+                myMenu.addEventListener("itemClick", changePreviewHandler);
+                popBtnPreview.popUp = myMenu;
+            }
+
+            // Define the event listener for the Menu control's change event.
+            private function changePreviewHandler(event:MenuEvent):void {
+                var label:String = event.label;
+//                popTypeB.text=String("Moved to " + label);
+                popBtnPreview.label = "Preview: " + label;
+                popBtnPreview.close();
+                
+                if(event.item.label == "xml") {
+                	previewTestCase('xml');	
+                }else if(event.item.label == "tbl")
+                {
+                	previewTestCase('tbl');
+                }else if(event.item.label == "dat") {
+                	previewTestCase('dat');
+                }
+            }
+            
+            private function setXMLCaseFolder(event:Event):void
+            {
+            	try
+				{
+					caseXMLdirectory.browseForDirectory("Select Directory Containing Test Definition XML");
+					caseXMLdirectory.addEventListener(Event.SELECT, caseXMLdirectorySelected);
+				}
+				catch (error:Error)
+				{
+					trace("Failed:", error.message);
+				}
+            } 
+            
+            private function caseXMLdirectorySelected(event:Event):void {
+            	caseXMLdirectory = event.target as File;
+				caseXMLFolder= caseXMLdirectory.nativePath
+				
+				//start to load xml file under this folder
+//				var list:Array = caseXMLdirectory.getDirectoryListing();
+//				for (var i:uint = 0; i < list.length; i++) {
+//    				if(File(list[i]).extension == 'xml') {
+//    					trace(list[i].nativePath);
+//    					loadTestCaseFile(File(list[i].nativePath))
+//    				}
+//				}
+				loadTestCase(event);
+            }
+            
+            private function loadTestCase(event:Event):void
+            {
+            	//start to load xml file under this folder
+				var list:Array = caseXMLdirectory.getDirectoryListing();
+				var root:XML = new XML("<root/>");
+				for (var i:uint = 0; i < list.length; i++) {
+    				trace(list[i].nativePath);
+    				
+    				if(File(list[i]).extension == 'xml') {
+    					root = loadTestCaseFile(list[i],root)
+    				}
+				}
+				caseList = root
+            }
+            
+            private function loadTestCaseFile(xmlFile:File, root:XML):XML 
+			{
+				var file:File= xmlFile ;
+				var fs:FileStream=new FileStream();
+				fs.open(file, FileMode.READ)
+				var content:String;
+				while (fs.bytesAvailable)
+				{
+					content=fs.readUTFBytes(fs.bytesAvailable);
+				}
+				fs.close();
+				
+				var caseContentXML:XML=new XML(content)
+				
+				return processCaseXML(caseContentXML, root)
+//				demo.addEventListener(CollectionEvent.COLLECTION_CHANGE, collectionChange)
+//				XML.prettyPrinting=true
+//				XML.prettyIndent=2
+//				debug.text=demo.toXMLString()
+				
+			}
+			
+			private function processCaseXML(xml:XML, root:XML):XML
+			{
+//				var root:XML = new XML("<root/>")
+				
+				var caseNode:XML;
+				
+				var parentNode:XML = new XML("<folder/>");
+				var parentList:ArrayCollection = new ArrayCollection(new Array());
+				
+				//loop every test case
+				for each(var row:XML in xml.data.row) {
+					caseNode = new XML("<tc/>")
+					var defindID:String = row.column.(@name =='Defined ID')
+					var testName:String = row.column.(@name =='TestName')
+					var testDesc:String = row.column.(@name =='TestDescription')
+					var testCreator:String =  row.column.(@name =='TestCreator')
+					
+					caseNode.@name = defindID
+					caseNode.@title = testName		
+					caseNode.@desc = "<body style=\"font-family:Times;font-size:12px\">" + testDesc + "</body>"								
+					caseNode.@creator = testCreator
+					
+					// is this case completed, which depends on whether we could find related .tbl and .dat files
+					var isReady:Boolean = isTestCaseReady(rootFolder, defindID)
+					caseNode.@ready = isReady
+					
+					// decide this node's parent node
+					var ids:Array = defindID.split("-")
+					
+					// setup chain
+					parentNode = setupParentChain(root,ids.slice(0,-1))
+					parentNode.appendChild(caseNode)
+					
+					//aaa-bbb-ccc-9302, its parent folder should be ccc
+					
+//					ids.pop()
+//					var parent:String = ids.join("-");
+					trace("Parent:" + parent);
+				}
+				return root
+			}
+			
+			private function isTestCaseReady(rootPath:String, definedID:String):Boolean
+			{
+				var tblPath:String = rootFolder.concat(File.separator, definedID, '.tbl')
+				var datPath:String = rootFolder.concat(File.separator, definedID, '.dat')
+				
+				var tbl:File = new File(tblPath)
+				var dat:File = new File(datPath)
+				
+				var result:Boolean = tbl.exists && dat.exists
+				return result 
+			}
+			
+			
+			private function setupParentChain(root:XML, parents:Array):XML
+			{
+				var p:XML = root;
+				var node:XML 
+				var loc:int = 0
+				for each(var item:String in parents) {
+					
+					var tt:XMLList = p.folder.(@name == item)
+					// create the node if not exists
+					if( tt.length() == 0) {
+						node = new XML("<folder name='"+ item +"'/>")
+						p.appendChild(node)
+						p = node
+					}else {
+						// here ,we assume no duplicated node exists here.
+						p = tt[0]  
+					}
+				}
+				return p
+			}
+
+
+			private function treeCasechangeEvtHandler(event:Event):void
+			{
+				confirmModified();
+				
+				var node:XML = event.currentTarget.selectedItem as XML
+				
+				if(node.name() != 'tc')  {
+					return
+				}
+				
+				var definedID:String = event.currentTarget.selectedItem.@name
+				
+				var tblFileName:String
+				var datFileName:String
+				
+				tblFileName= directory.nativePath + File.separator  + definedID+".tbl"
+				var matchPtn:RegExp = /tbl$/
+				datFileName = tblFileName.replace(matchPtn,"dat");
+				
+				if(new File(tblFileName).exists){
+					var _tbl:String = readFile(tblFileName);
+					var _dat:String = readFile(datFileName);
+					demo = parseTBL(definedID, _tbl, _dat)
+				}else{
+//					Alert.show("no tbl.dat found!:" + tblFileName)
+					demo = new XML("<TestCase definedid='"+ definedID +"' type='FAST' atp='1'/>")
+					var titleXMLNode:XML = new XML("<Title><![CDATA[" + node.@title +"\]\]></Title>")
+					demo.appendChild(titleXMLNode)
+					
+					var descXMLNode:XML = new XML("<Desc><![CDATA[" + node.@desc +"\]\]></Desc>")
+					demo.appendChild(descXMLNode)
+					
+					info.text = "+Err, No TBL/DAT file found, " + tblFileName + "\n";
+				}
+				
+				
+			}
+            
+			private function onInit(event:Event):void
+			{
+				// checking for update
+				checkUpdate();
+				// load keywor list
+				useHttpService(null);
+//				stage.nativeWindow.maximize();
+//				stage.addEventListener(KeyboardEvent.KEY_DOWN, keyListener);
+				optionContainer = hboxOption.parent
+				optionIndex = optionContainer.getChildIndex(hboxOption)
+                hboxOption.addEventListener(Event.ADDED_TO_STAGE, enableHideOption)
+                hboxOption.addEventListener(Event.REMOVED_FROM_STAGE, enableShowOption)
+			}
+			
+			private function enableShowOption(event:Event):void
+            {
+                linkButtonToggleOption.label='Show option';    
+            }
+            
+            private function enableHideOption(event:Event):void
+            {
+                linkButtonToggleOption.label='Hide option';
+            }
+
+		private function toggleOptionBox(event:Event):void
+            {
+                if (hboxOption.parent == null) {
+                    // add it the stage
+                    optionContainer.addChildAt(hboxOption,0)
+                }else
+                {
+                    optionContainer.removeChild(hboxOption)
+                }
+}
+
+			
+			
+			
+			private function keyListener(event:KeyboardEvent):void
+			{
+				if (event.ctrlKey)
+				{
+					event.preventDefault();
+					switch (String.fromCharCode(event.charCode))
+					{
+						case "c":
+							NativeApplication.nativeApplication.copy();
+							break;
+						case "x":
+							NativeApplication.nativeApplication.cut();
+							break;
+						case "v":
+							NativeApplication.nativeApplication.paste();
+							break;
+						case "a":
+							NativeApplication.nativeApplication.selectAll();
+							break;
+						case "z":
+							NativeApplication.nativeApplication.undo();
+							break;
+						case "y":
+							NativeApplication.nativeApplication.redo();
+							break;
+					}
+				}
+			}
+
+
+			
+			
+			private function setTestRoot(event:Event):void
+			{
+					try
+				{
+					directory.browseForDirectory("Select Directory");
+					directory.addEventListener(Event.SELECT, directorySelected);
+				}
+				catch (error:Error)
+				{
+					trace("Failed:", error.message);
+				}
+				
+				
+//				tree.directory = new File("E:\\rainbow\\")
+//				trace(testRoot.text)
+//				var _new:File = new File(testRoot.text)
+//				
+//				if(_new.exists) {
+//					tree.directory = _new
+//				}else
+//				{
+//					Alert.show("Error! " + testRoot.text + " doesn't exist.");
+//				}
+			}
+			
+			private function directorySelected(event:Event):void
+			{
+				directory = event.target as File;
+				tree.directory = directory
+				rootFolder = directory.nativePath
+//				var files:Array=directory.getDirectoryListing();
+//				for (var i:uint=0; i < files.length; i++)
+//				{
+//					trace(files[i].name);
+//					rootFolder=files[i].name
+//				}
+			}
+			
+			private function showHelpMsgAboutKeyword(node:XML):String
+			{
+				var theData:String = ''
+				theData = "[Keyword]:" + node.@name + "\n"
+					theData += "[Desc]: " + node.@desc + "\n"
+					theData += "[Parameters]: \n"
+					
+					// preview the parameter belongs to it
+					var ps:XMLList= node.param
+					for(var i:int=0; i<ps.length(); i++) {
+						theData += ps[i].@name + "\t" + ps[i].@desc + "\n"
+					}
+				
+				return theData
+			}
+			
+			
+			private function changeEvt(event:Event):void
+			{
+				var theData:String=""
+				
+				var node:XML = event.currentTarget.selectedItem as XML
+				
+				trace(node.localName())
+				var type:String = node.localName() as String
+				if (type == 'module'){
+					theData = "[Module]: " + node.@name
+				}else if(type == "keyword"){
+					theData = showHelpMsgAboutKeyword(node)
+				}else if(type == "param"){
+					theData = "[Param]: " + node.@name + "\n"
+					theData += "[Desc]: " + node.@desc + "\n"
+				} 
+				// the node is keyword
+//				
+//				if (event.currentTarget.selectedItem.@desc)
+//				{
+//					theData=" : " + event.currentTarget.selectedItem.@desc;
+//				}
+				info.text = theData;
+
+			}
+
+			
+			private function onChangekeywordDataGrid(event:Event):void
+			{
+				// display related keyword information in the status bar
+				var keyname:String =dgKeyword.selectedItem.@keyname 
+				var showStr:String = ''
+				var module:String = ''
+				var key:String = ''
+				// parsing keyword name into "module" and "keyword"
+				var keywordPtn:RegExp = /IMSX7(\w+)::(\S+)/
+				
+				
+				var result:Array =keyname.match(keywordPtn) 
+				if(result){
+					module = result[1]
+					key = result[2]
+				}else{
+					showStr.concat(keyname, " is not in valid format!")
+					info.text = showStr
+					return
+				}
+				
+				var modules:XMLList = keywordList.module.(@name==module)
+				if(modules.length() == 0) {
+					info.text = "cannot find help message about module [" + module + "]"
+					return
+				}
+				
+				var keys:XMLList = modules[0].keyword.(@name==key)
+				if(keys.length() == 0) {
+					info.text = "cannot find help message about key [" + key + "]"
+					return
+				}
+				
+				info.text = "[Module] " + module + "\n";
+				info.text +=showHelpMsgAboutKeyword(keys[0])
+					
+			}
+
+            public function useHttpService(parameters:Object):void {
+                service = new HTTPService();
+//                service.url = "http://nj-kevin-young9:3000/plan/flex_keyword";
+				service.url = textInputURL.text
+//				service.url = keywordURL;
+				
+                service.method = "GET";
+                service.resultFormat = "e4x";
+                service.addEventListener("result", httpResult);
+                service.addEventListener("fault", httpFault);
+                service.send(parameters);
+                keywordStatus.text = "loading..."
+//                imgKeywordStatus.source = "@Embed('assets/loading.gif')"
+				imgKeywordStatus.source = myLoadingIcon
+            }
+            
+            private function AutoComplete_onSelectChange(event:Event):void
+			{
+				// dynamic show the form
+				if (myAuto.selectedItem != null)
+				{
+					trace(myAuto.selectedItem);
+					var item:XMLList=myAuto.selectedItem.param as XMLList
+					var paramList:ArrayCollection=new ArrayCollection()
+					var i:int = 0;
+					
+					// when we are editing step, we need to keep its orginal item
+					if( (panelParam.title == "editing...")
+						 && (myAuto.selectedItem.name == dgKeyword.selectedItem.@keyname) )
+					{
+						var ps:XMLList=dgKeyword.selectedItem.Para as XMLList
+						for (i=0; i < ps.length(); i++)
+						{
+							paramList.addItem({name: ps[i].@paraname.toString(), value: ps[i].toString()})
+						}
+//						// the selected keyword is just the original one
+//						if(myAuto.selectedItem.name == dgKeyword.selectedItem.@keyname)
+//						{
+//							var ps:XMLList=dgKeyword.selectedItem.Para as XMLList
+//							for (i=0; i < ps.length(); i++)
+//							{
+//								paramList.addItem({name: ps[i].@paraname.toString(), value: ps[i].toString()})
+//							}							
+//						}
+					}else{
+							for (i=0; i < item.length(); i++)
+							{
+								var pvalue:String = ''
+								if(item[i].@default){
+									pvalue = item[i].@default.toString();
+								}
+								paramList.addItem({name: item[i].@name.toString(), value: pvalue})
+							}
+					}
+					dgParam.dataProvider=paramList
+					dgParam.visible=true
+				}
+				else
+				{
+					dgParam.dataProvider=null
+				}
+			}
+
+            public function httpResult(event:ResultEvent):void {
+//            	Alert.show("keyword loaded...");
+				keywordStatus.text = "Loaded"
+				
+                keywordList = event.result as XML
+                var ms:XMLList = keywordList.module 
+                
+//				var ks:Object = event.result..keyword
+
+				// i need to construct _myData
+				_myData.removeAll() 
+				
+				for(var j:int=0; j<ms.length(); j++) {
+					var ks:XMLList = ms[j].keyword
+					for(var i:int=0; i<ks.length(); i++) {						
+						var _tmp:Object = {name: PROJECT_NAME + keywordList.module[j].@name.toString()+"::"+keywordList.module[j].keyword[i].@name.toString()
+							, param:keywordList.module[j].keyword[i].param }					
+						_myData.addItem(_tmp)
+					}					
+				}
+				
+				trace(_myData)
+                myAuto.dataProvider = _myData
+                
+                //set image 
+                imgKeywordStatus.source = myConnectIcon
+
+//                var temp:ArrayCollection = keywordList.children()
+                
+            //Do something with the result.
+            }
+
+            public function httpFault(event:FaultEvent):void {
+                var faultstring:String = event.fault.faultString;
+                Alert.show(faultstring);
+                keywordStatus.text = "failed..."
+                imgKeywordStatus.source = myDisConnectIcon
+            }
+			
+			private function caseComposerOnCancel(event:Event):void 
+			{
+				PopUpManager.removePopUp(myStepComposer)
+			}
+
+			public function loadXML():void
+			{
+				var xmlLoader:URLLoader=new URLLoader();
+				xmlLoader.load(new URLRequest("keyword.xml"));
+				xmlLoader.addEventListener(Event.COMPLETE, handleLoad);
+			}
+
+			public function handleLoad(event:Event):void
+			{
+				keywordList =new XML(event.target.data);
+			}
+			
+			
+			public function confirmCaseSave(eventObj:CloseEvent):void
+			{
+			   if(eventObj.detail==Alert.YES)
+			   {				   	
+			       // good, save current test case from demo 
+			       saveTestCase(lastModifiedCase)			       
+			       // 
+			   }
+			   else if(eventObj.detail==Alert.NO)
+			   {
+			   		// discard modification
+			   		modifyCaseFlag(false);
+			   }						
+			   else if(eventObj.detail==Alert.CANCEL)
+			   {
+			       // don't change case handler
+//			       modifyCaseFlag(false);
+			   }
+			   
+			}
+			
+			private function confirmModified():void
+			{
+				if (caseModified){
+					// remind user to save or cancel the selection
+					var id:String  = demo.@definedid.toString()
+					lastModifiedCase = demo.copy()
+					var alertStr:String = "Do you want to save test case "
+					alertStr =  alertStr.concat('[', id, ']?')
+					Alert.show(alertStr,"Warning",Alert.YES|Alert.NO, this,confirmCaseSave,null,Alert.OK);
+				}
+			}
+
+			private function changeHandler(event:Event):void
+			{
+				confirmModified();
+				
+				event.preventDefault()
+				
+				trace(event.target.selectedPath);
+				var ext:String=event.target.selectedItem.extension;
+				var file:File = null;
+				var tblFileName:String
+				var datFileName:String
+				var xmlString:String
+				var matchPtn:RegExp
+				var _tbl:String
+				var _dat:String
+				
+				var definedID:String = "";
+				
+				var fileNameArray:Array = event.target.selectedPath.split(File.separator)
+				var filename:String= fileNameArray[fileNameArray.length-1]
+				trace(filename);
+				definedID = filename.substr(0, filename.length-4)
+
+				if (ext == 'xml')
+				{
+					//read content and display it in txt
+					file =new File(event.target.selectedPath);
+					var fs:FileStream=new FileStream();
+					fs.open(file, FileMode.READ)
+					while (fs.bytesAvailable)
+					{
+						xmlString +=fs.readUTFBytes(fs.bytesAvailable);
+					}
+					demo=new XML(xmlString) 
+					XML.prettyPrinting=true
+					XML.prettyIndent=2
+//					debug.text=demo.toXMLString()
+					fs.close();
+					return ;
+				}else if(ext == 'tbl') {
+					tblFileName= event.target.selectedPath
+					matchPtn = /tbl$/
+					datFileName = tblFileName.replace(matchPtn,"dat");
+				}
+				else if(ext == 'dat') {
+					datFileName = event.target.selectedPath
+					matchPtn = /dat$/
+					tblFileName = datFileName.replace(matchPtn,"tbl");
+				}else{
+					return
+				}
+				
+				_tbl = readFile(tblFileName);
+				_dat = readFile(datFileName);
+				
+				try {
+					modifyCaseFlag(false)
+					demo = parseTBL(definedID, _tbl, _dat)
+					trimEndingNumberInParam(demo)
+				}
+				catch(e:Error)
+				{
+					info.text = "Format Error, cannot load " + tblFileName + "..." + "\n";
+					info.text += e.message + "\n";
+					info.text += e.getStackTrace()
+				}
+				
+				info.text = "+OK, load " + tblFileName + "..." + "\n";
+			}
+			
+			// trim all the ending numbers in XML
+			private function trimEndingNumberInParam(tc:XML):void
+			{
+				for each(var p:XML in tc..Para){
+					trace(p.@paraname.toString())
+					
+					// white-list here, some keyword has parameter name which is end with 'number', crap...
+					var pname:String = p.@paraname.toString();
+//					var key:XML = p.parent()
+					if(p.parent().@keyname.toString() == 'IMSX7Policy::runtask') 
+					{
+//						numberPtn = /_\d{1}(\d+)$/
+						continue;
+					}
+					var numberPtn:RegExp = /(\d+)$/			
+					p.@paraname= pname.replace(numberPtn, "")
+				}
+			}
+			
+			private function readFile(filename:String):String
+			{
+				var fs:FileStream=new FileStream();
+					fs.open(new File(filename), FileMode.READ)
+//					while (fs.bytesAvailable)
+//					{
+//						desc.text=fs.readUTFBytes(fs.bytesAvailable);
+//					}
+					var code:String;
+					var b1:int = fs.readByte();
+					var b2:int = fs.readByte();
+					switch(true){
+					     case (b1==-1&&b2==-2):
+					          code = "unicode";
+					          break;
+					    case (b1==-2&&b2==-1):
+					     	  code = "unicodeFFFE";
+						  break;
+					    case (b1==-17&&b2==-69):
+					    	   code = "utf-8";
+						   break;
+					    default:	code = "ansi";
+					break;
+					}
+					var fileContent:String = String.fromCharCode(b1,b2);
+					while(fs.bytesAvailable) {
+						fileContent += fs.readMultiByte(fs.bytesAvailable,code);
+					} 
+					fs.close();
+					
+					return fileContent;
+			}
+			
+			private function parseTBL(definedID:String, content:String, dat:String):XML
+			{
+				var result:XML = new XML("<TestCase definedid='"+ definedID +"' type='FAST' atp='1'/>")
+				var keywordNode:XML = null;
+				var paramNode:XML = null;
+				var paramValue:String = "";
+				
+				var title:String = "== test title =="
+				var lines:Array = content.split(String.fromCharCode(13,10))
+				
+				var descPtn:RegExp = /\[desc =(.*)/
+				var theFirstLine:String = lines[0]
+				if( theFirstLine.match(descPtn) != null){
+					// this line is description line
+					var descArray:Array = lines.splice(0,1)
+					title = theFirstLine.replace(descPtn, "$1")
+					
+					//remove the last character
+					title = title.substr(0, title.length-1) 
+//					desc = descArray[0].replace(descPtn, "$1")
+				}
+				
+				// add a title item
+				var titleXMLNode:XML = new XML("<Title><![CDATA[" + title +"\]\]></Title>")
+				result.appendChild(titleXMLNode)
+				
+				// query description of test case form test case xml
+				var desc:String= ""
+				if (caseList != null) {
+					var cases:XMLList = caseList..tc.(@name == definedID)
+					if(cases.length() == 1) {
+						desc = cases[0].@desc.toString()	
+					}
+				}
+				
+				// add a desc itemv
+				var descStr:String = "";
+				descStr = descStr.concat("<Desc><![CDATA[",desc, "\]\]></Desc>") 
+				var descXMLNode:XML = new XML(descStr)
+//				var descXMLNode:XML = new XML("<Desc><![CDATA[" + desc +"\]\]></Desc>")
+				result.appendChild(descXMLNode)
+				
+				
+				
+				for each(var s:String in lines) {
+					if (s == "") {
+						continue;	
+					}
+					 
+					trace("Line: " + s);
+					var lineItmes:Array = s.split("|")
+					var keyword:String = lineItmes[2]
+					
+					// construct keyword node
+					keywordNode = new XML("<KeyWord keyname='" + keyword + "'/>")
+					// paramlist is 'null'
+					
+					//TODO: 
+					// here we need to detect whether tbl is valid taf file
+					
+					// carefully check schema of tbl and dat file
+					// Some tbl may have below format like
+					// "localhost|null|IMSX7GUI::logoff|continue"
+					//  so, we need to support it
+					
+					if(lineItmes.length == 5 && lineItmes[4] != "null"){
+						trace("item:" + lineItmes[4] + "\n")
+						var paramNameList:Array = lineItmes[4].split(","); 
+						for each(var param:String in paramNameList) {
+							paramValue = getParamValueFromDat(param, dat);
+							// insert parameter
+							paramNode = new XML("<Para paraname='" + param  +"'>" + paramValue +"</Para>")
+							keywordNode.appendChild(paramNode)
+						}
+					}
+					// start construct XML content
+					result.appendChild(keywordNode)
+				}
+				
+				trace(result.toXMLString())
+				return result;
+			}
+			
+			private function getParamValueFromDat(param:String, dat:String):String
+			{
+				var datLines:Array = dat.split(String.fromCharCode(13,10))
+				
+				var paramNames:Array = datLines[0].split("|")
+				var paramValues:Array = datLines[1].split("|")
+				var index:int = 0;
+				
+				for each(var name:String in paramNames){
+					if(name == param) {
+						break;
+					}
+					index++
+				}
+				return paramValues[index]
+			}
+			
+			private function xml2TblAndDat(xml:XML):void
+			{
+				var tblArray:Array = new Array();
+				var paraNameArry:Array = new Array();
+				var paraValueArry:Array = new Array();
+				
+				var tmp:XMLList = xml.Title
+				trace(tmp)
+				
+				// prepare the description
+				tblArray.push("[desc = "+ xml.Title[0] + "]")
+				
+				var lineNo:int = 0;
+				for each(var keyword:XML in xml.KeyWord){
+					var lineArray:Array = new Array();
+					lineArray.push("localhost", "null");
+					lineArray.push(keyword.@keyname.toString())
+					lineArray.push("continue");
+					
+					// construct parameter list string
+					if(keyword.Para.length() == 0) {
+						// no parameter needed here, so we append 'null' in tbl file
+						lineArray.push("null");
+					}else {
+						// group all the parameter together
+						var ps:Array = new Array();
+						
+						for each(var param:XML in keyword.Para) {
+							var pName:String = param.@paraname.toString()
+							// this one is for tbl file
+							ps.push(pName.concat(lineNo))
+							
+							// this one is for dat file
+							paraNameArry.push(pName.concat(lineNo))
+							paraValueArry.push(param.toString())
+						}
+						
+						// construct the last element in tbl line
+						lineArray.push(ps.join(","))
+					}
+					tblArray.push(lineArray.join("|"));
+					lineNo++;
+				}
+				
+				tblContent = showTbl(tblArray);
+				datContent = showDat(paraNameArry,paraValueArry);
+			}
+			
+			private function showTbl(tbl:Array):String
+			{
+				var result:String = ""
+				return tbl.join("\r\n")
+			} 	
+			
+			private function showDat(paraNameArray:Array, paraValueArray:Array):String
+			{
+				var result:String = ""						
+				paraNameArray.join("|")
+				paraValueArray.join("|")
+				return result.concat(paraNameArray.join("|"), "\r\n",paraValueArray.join("|")) 
+				
+			}
+		
+			
+			private function editCurrentStep(event:Event):void
+			{
+				if (event.currentTarget.selectedItem == null) {
+					return;
+				}
+				
+				dgKeyword.enabled = false
+					
+				currentState=''
+				panelParam.title = "editing..."
+				dgParam.dataProvider = null
+				
+				//populate the keyword
+//				myAuto.textInput.textInput.text
+				myAuto.searchText = dgKeyword.selectedItem.@keyname
+				myAuto.search()
+//				if (myAuto.dispatchEvent(new Event(AutoComplete.SEARCH_CHANGE )) )
+//				{
+//					Alert.show("Yes")
+//				}
+				
+				// populate data into the parameter datagrid
+				// notes: if keyword not change, keep the original parameters
+				info.text = dgKeyword.selectedItem.@keyname				
+				var item:XMLList=dgKeyword.selectedItem.Para as XMLList
+				var paramList:ArrayCollection=new ArrayCollection()
+				for (var i:int=0; i < item.length(); i++)
+				{
+					paramList.addItem({name: item[i].@paraname.toString(), value: item[i].toString()})
+				}
+				dgParam.dataProvider=paramList
+				dgParam.visible=true
+			}
+			
+			private function keywordListFilterFunc(item:Object):Boolean
+			{
+				trace(item)
+				return true;
+			}
+
+			private function xmlFilterFunc(file:File):Boolean
+			{
+//				if (file.isDirectory || file.extension == 'tbl' || file.extension == 'dat')
+				if (file.isDirectory || file.extension == 'tbl')
+					return true;
+				else
+					return false;
+			}
+			import mx.controls.dataGridClasses.DataGridColumn;
+
+			private function getParamList(item:Object, column:DataGridColumn):String
+			{
+				var paramList:XMLListCollection=new XMLListCollection(item.Para)
+				var result:String="";
+
+				for (var i:int; i < paramList.length; i++)
+				{
+//			 		result += paramList[i].@paraname;
+					result+=paramList[i]
+					result+=", ";
+				}
+				result=result.substr(0, result.length - 2)
+				return result
+			}
+			
+			private function dragEnterHandler(event:DragEvent):void
+			{
+				// Get the drop target component from the event object.
+                var dropTarget:DataGrid=event.currentTarget as DataGrid;
+    
+                // Accept the drag only if the user is dragging data 
+                // identified by the 'value' format value.
+
+                if (event.dragSource.hasFormat('items') || event.dragSource.hasFormat('treeitems') ) 
+                {
+                    // Make the border of the Box thicker to 
+                    // visually signal to the user that they can 
+                    // drop the coin there.
+
+//                    dropTarget.setStyle("borderThickness", 5);
+                    
+                    // Accept the drop.
+                    DragManager.acceptDragDrop(dropTarget);
+                }
+
+				// always accept with no conditions
+				DragManager.acceptDragDrop(event.currentTarget as IUIComponent);
+			}
+			
+			private function treeDragCompleteHandler(event:DragEvent):void
+			{
+				event.preventDefault();
+			}
+			
+			private function dragDropHandler(event:DragEvent):void
+			{
+				var ds:DragSource = event.dragSource;
+                var dropTarget:DataGrid = DataGrid(event.currentTarget);
+                var arr:Array;
+                if( ds.hasFormat("items") ) {
+
+                    arr = ds.dataForFormat("items") as Array;
+                } else if( ds.hasFormat("treeItems") ) {
+
+                    arr = ds.dataForFormat("treeItems") as Array;
+                    
+                    // only 1 item is allow to drag at one time
+                  
+                    var node:XML = XML(arr[0]);
+                    var item:Object = new Object();
+                    
+                    // append module name
+                    var moduleName:String  = node.parent().@name.toString()
+                    
+                    // construct a step
+                    var stepNodeXML:XML = new XML("<KeyWord keyname='" + 'IMSX7' + moduleName + '::'+node.@name.toString()+ "'/>")
+                    for each(var ps:XML in node.param){
+                    	var paraNodeXML:XML = new XML("<Para paraname='" + ps.@name.toString() + "'>" + '--' +"</Para>");
+                    	stepNodeXML.appendChild(paraNodeXML)
+                    }
+                    
+					var r:int=dgKeyword.calculateDropIndex(event);
+					var t:int=dgKeyword.selectedIndex;
+					
+					// append this step into xml data
+					if (r == 0){
+						demo.prependChild(stepNodeXML)
+					}else if( r > 0 && r <= demo.KeyWord.length() ){
+						demo.insertChildAfter(demo.KeyWord[r-1], stepNodeXML)
+					}else {
+						demo.appendChild(stepNodeXML)
+					}
+                }
+                
+                modifyCaseFlag(true)
+//                onDragExit(event); 
+			}
+
+			private function modifyCaseFlag(flag:Boolean):void
+			{
+				caseModified = flag;
+			}
+			
+			
+			private function saveStep():void
+			{
+				// append the step into dataGird
+				var keyword:String = myAuto.text
+				
+				// param list of object {name, value}
+				var paraList:ArrayCollection = dgParam.dataProvider as ArrayCollection
+				
+				var stepXMLNode:XML = new XML("<KeyWord/>")
+				stepXMLNode.@keyname = keyword
+				for(var i:int=0; i<paraList.length; i++) {
+					stepXMLNode.Para[i] = paraList[i].value
+					stepXMLNode.Para[i].@paraname = paraList[i].name
+				}
+				  
+				
+				// compose a step in XML and insert into the datasource 
+				var _index:int = dgKeyword.selectedIndex
+				
+				if(panelParam.title == "editing...") {
+					// delete current one and insert new one
+					delete demo.KeyWord[_index]
+					
+					if(_index == 0) {
+						demo.appendChild(stepXMLNode)
+						dgKeyword.selectedIndex =  dgKeyword.rowCount - 1
+						
+					}else{
+						demo = demo.insertChildAfter(demo.KeyWord[_index-1], stepXMLNode)
+						// hightlight the editing item
+						dgKeyword.selectedIndex = _index
+						dgKeyword.scrollToIndex(_index)
+					}
+					// switch back to StateNormal				
+					currentState='StateNormal';
+					dgKeyword.enabled = true;
+					
+				}else{
+					// adding a new step
+					if(_index == -1) {
+						//no item is selected. insert into the last
+						demo.appendChild(stepXMLNode)
+						dgKeyword.selectedIndex =  dgKeyword.rowCount - 1
+					}else{
+						
+						var loc:XML = demo.KeyWord[dgKeyword.selectedIndex]
+						demo = demo.insertChildAfter(demo.KeyWord[dgKeyword.selectedIndex], stepXMLNode)
+						dgKeyword.selectedIndex =  _index+1
+					}
+					
+					// switch back to StateNormal				
+					currentState='StateNormal';
+				}
+				
+				dgKeyword.scrollToIndex(dgKeyword.selectedIndex) 
+				
+				// flag the data change
+				modifyCaseFlag(true)
+				
+				// switch back to StateNormal				
+//				currentState='StateNormal';
+			}
+			
+			
+			private function removeStep(event:Event):void
+			{
+				var xx:* = dgKeyword.selectedItems
+				if(dgKeyword.selectedItems.length == 0) {
+					Alert.show("No step is selected");
+				}else {
+					// since every test case cotains 2 chidlren: Title and Desc beside keywords
+					// which means, the index in DataGrid is 2 less than child index
+					
+					var lastIndex:int = 0
+					// loop each and delete them
+					for each(var step:XML in dgKeyword.selectedItems){
+						lastIndex = step.childIndex()
+						delete demo.KeyWord[lastIndex-2]
+//						delete demo.KeyWord[lastIndex]
+					}
+					
+					// decide which one is hightlight
+					dgKeyword.selectedIndex = lastIndex-2
+					 
+					dgKeyword.scrollToIndex(lastIndex-2)
+					
+					// to remind user to save modification
+					modifyCaseFlag(true)
+					
+				}
+				
+//				var _index:int = dgKeyword.selectedIndex
+//				
+//				if(_index == -1) {
+//					//no item is selected. insert into the last
+//					Alert.show("No step is selected");
+//				}else{
+//					delete demo.KeyWord[_index]
+//					var stepToBeRemoved:XML = demo.SelectedItem					
+//					
+//					dgKeyword.selectedIndex = _index
+//					dgKeyword.scrollToIndex(_index)
+//				}
+			}
+            
+            private function newStepButtonClickHandler(event:Event):void
+            {
+            	// show
+            	myStepComposer.addEventListener(Event.CANCEL, caseComposerOnCancel)
+            	myStepComposer.addEventListener(CloseEvent.CLOSE, caseComposerOnCancel)
+            	PopUpManager.addPopUp(myStepComposer,this, true)
+            	PopUpManager.centerPopUp(myStepComposer)
+            }
+            
+            private function previewTestCase(format:String):void
+            {
+            	if(format == 'xml'){
+            		preview.previewData =  demo.toXMLString()
+            	}else if(format == 'tbl'){
+            		xml2TblAndDat(demo)
+            		preview.previewData =  tblContent
+            	}else if(format == 'dat') {
+            		xml2TblAndDat(demo)
+            		preview.previewData =  datContent
+            	}
+            	preview.addEventListener(CloseEvent.CLOSE, onClosePreviewWindow)
+            	preview.addEventListener(Event.CANCEL, onClosePreviewWindow)
+            	PopUpManager.addPopUp(preview,this,true)
+            	PopUpManager.centerPopUp(preview)
+            }
+            
+            private function previewButtonClickHandler(event:Event):void
+            {
+            	previewTestCase('xml')
+            }
+            
+            private function onClosePreviewWindow(event:Event):void
+            {
+            	PopUpManager.removePopUp(preview)
+            }
+            
+            
+            private function saveTestCase(caseXML:XML):void
+            {
+            	if(!caseXML){
+            		Alert.show("Err, no test case modified")
+            		return;
+            	}
+            	var definedID:String = caseXML.@definedid
+            	var tblFilename:String = rootFolder.concat(File.separator, definedID, '.tbl')
+				var datFilename:String = rootFolder.concat(File.separator, definedID, '.dat')
+				
+				            	
+            	var fileStream:FileStream = new FileStream();
+				
+        		// update tbl and dat content
+        		xml2TblAndDat(caseXML);
+        		
+        		trace(datFilename)
+        		trace(tblFilename)
+        		
+        		// write tbl
+        		fileStream.open(new File(tblFilename), FileMode.WRITE);
+        		fileStream.writeUTFBytes(tblContent);
+        		fileStream.close();
+        		
+        		info.text += "Save ok! " + tblFilename + "\n"
+        		
+        		// write dat
+        		fileStream.open(new File(datFilename), FileMode.WRITE);
+        		fileStream.writeUTFBytes(datContent);
+        		fileStream.close();
+        		
+        		//change icon
+//        		dest.@ready = true
+				// how to get the reference to the tree node of this case
+				var cases:XMLList = caseList..tc.(@name == definedID)
+				if(cases.length() == 1) {
+						cases[0].@ready = true	
+				}
+        		
+        		info.text += "Save ok! " + datFilename + "\n"
+        		
+        		modifyCaseFlag(false);
+            }
+            
+            private function saveCasehandler(event:Event):void
+            {
+            	
+            	if (viewstack1.selectedIndex == 0){
+            		// in the file view
+            		saveXMLonClickHandler(event);
+            	}else if(viewstack1.selectedIndex == 1) {
+            		// in the case list view
+            		saveXMLonClickHandler_new(event)
+            	}
+            	
+            	// disable the "Save" buttion
+            	modifyCaseFlag(false)
+            }
+            
+            private function saveXMLonClickHandler_new(event:Event):void
+            {
+            	var dest:XML = treeCase.selectedItem as XML
+//				var dest:Object = treeCase.selectedItem
+            	if ( dest == null) {
+            		Alert.show("Please specify the test case");
+            		return;
+            	}
+            	
+            	if (dest.localName() != 'tc') {
+            		Alert.show("Please specify test case, not folder");
+            		return;
+            	}
+            	
+            	var definedID:String = dest.@name
+            	var tblFilename:String = rootFolder.concat(File.separator, definedID, '.tbl')
+				var datFilename:String = rootFolder.concat(File.separator, definedID, '.dat')
+				
+				            	
+            	var fileStream:FileStream = new FileStream();
+				
+        		// update tbl and dat content
+        		xml2TblAndDat(demo);
+        		
+        		trace(datFilename)
+        		trace(tblFilename)
+        		
+        		// write tbl
+        		fileStream.open(new File(tblFilename), FileMode.WRITE);
+        		fileStream.writeUTFBytes(tblContent);
+        		fileStream.close();
+        		
+        		info.text += "Save ok! " + tblFilename + "\n"
+        		
+        		// write dat
+        		fileStream.open(new File(datFilename), FileMode.WRITE);
+        		fileStream.writeUTFBytes(datContent);
+        		fileStream.close();
+        		
+        		//change icon
+        		dest.@ready = true
+        		
+        		info.text += "Save ok! " + datFilename + "\n"
+            	
+            }
+            
+            private function saveXMLonClickHandler(event:Event):void
+            {
+            	var dest:File = tree.selectedItem as File
+//				var dest:Object = treeCase.selectedItem
+            	if ( dest == null) {
+            		Alert.show("Please specify the test case");
+            	}
+            	
+            	trace(dest.nativePath);
+            	var fileStream:FileStream = new FileStream();
+				
+            	if(dest.extension == 'xml'){
+            		fileStream.open(dest, FileMode.WRITE);
+            		fileStream.writeUTFBytes(demo.toXMLString());
+            		fileStream.close()
+            	}else if(dest.extension == 'tbl' ||  dest.extension == 'dat'){
+            		// update tbl and dat content
+            		xml2TblAndDat(demo);
+            		
+            		var extPattern:RegExp = /\.(\w{3})$/
+            		var datFilename:String = dest.nativePath.replace(extPattern, ".dat") 
+            		var tblFilename:String = dest.nativePath.replace(extPattern, ".tbl")
+            		
+            		trace(datFilename)
+            		trace(tblFilename)
+            		
+            		// write tbl
+            		fileStream.open(new File(tblFilename), FileMode.WRITE);
+            		fileStream.writeUTFBytes(tblContent);
+            		fileStream.close();
+            		
+            		info.text += "Save ok! " + tblFilename + "\n"
+            		
+            		// write dat
+            		fileStream.open(new File(datFilename), FileMode.WRITE);
+            		fileStream.writeUTFBytes(datContent);
+            		fileStream.close();
+            		
+            		info.text += "Save ok! " + datFilename + "\n"
+            	}
+//            	info.text += "Save ok! " + dest.nativePath + "\n"
+            }
+            
+            [Bindable]
+            [Embed("assets/disconnect.png")]
+            private var myDisConnectIcon:Class;
+            
+            [Bindable]
+            [Embed("assets/connect.png")]
+            private var myConnectIcon:Class;
+            
+            [Bindable]
+            [Embed("assets/loading.gif")]
+            private var myLoadingIcon:Class;
+            
+            [Bindable]
+            [Embed("assets/bullet_go.png")]
+            private var myBulletGoIcon:Class;
+
+            [Bindable]
+            [Embed("assets/bullet_star.png")]
+            private var myBulletStarIcon:Class;
+
+            [Bindable]
+            [Embed("assets/bullet_wrench.png")]
+            private var myBulletWrenchIcon:Class;
+            
+            [Bindable]
+            [Embed("assets/ball_glass_greenS.gif")]
+            private var myGreenBall:Class;
+            
+            [Bindable]
+            [Embed("assets/ball_glass_redS.gif")]
+            private var myRedBall:Class;
+            
+            private function treeKeyword_iconFunc(item:Object):Class {
+                var iconClass:Class;
+                switch (XML(item).localName()) {
+                    case "keyword":
+                        iconClass = myBulletWrenchIcon;
+                        break;
+                    case "param":
+                    	iconClass = myBulletStarIcon;
+                        break;
+                    case "module":
+                    	iconClass = myBulletGoIcon;
+                        break;
+                }
+                return iconClass;
+            }
+            
+            private function treeCase_iconFunc(item:Object):Class {
+                var iconClass:Class;
+                switch (XML(item).localName()) {
+                    case "folder":
+                        iconClass = myBulletWrenchIcon;
+                        break;
+                    case "tc":
+                    	if(XML(item).@ready == 'true'){
+                    		iconClass = myGreenBall;
+                    	}else if(XML(item).@ready == 'false') {
+                    		iconClass = myRedBall;
+                    	}
+                        break;
+                    case "module":
+                    	iconClass = myBulletGoIcon;
+                        break;
+                }
+                return iconClass;
+            }
+            
+            private function copyStep():void
+            {
+            		var textToCopy:String = getTextFromItems(dgKeyword.selectedItems)
+					Clipboard.generalClipboard.clear();
+					Clipboard.generalClipboard.setData(ClipboardFormats.TEXT_FORMAT, textToCopy, false);
+            }
+            
+            private function pasteStep():void
+            {
+				var text:String;
+				if (Clipboard.generalClipboard.hasFormat(ClipboardFormats.TEXT_FORMAT))
+				{
+					text=Clipboard.generalClipboard.getData(ClipboardFormats.TEXT_FORMAT) as String;
+				}
+
+				// insert the node next to the selected item
+				var startNode:Object=dgKeyword.selectedItem;
+				if (!startNode)
+				{
+					Alert.show("Specify the location");
+					return
+				}
+				else
+				{
+					var temp:XML=new XML(text)
+					for each (var step:XML in temp.KeyWord)
+					{
+						demo=demo.insertChildAfter(startNode, step)
+						dgKeyword.selectedItem=step
+//									demo.appendChild(step);	
+					}
+					modifyCaseFlag(true)
+				}
+            }
+            
+            private function setSystemClipborad():void
+            {
+            	var textToCopy:String = getTextFromItems(dgKeyword.selectedItems)
+							
+							Clipboard.generalClipboard.clear();
+							Clipboard.generalClipboard.setData(ClipboardFormats.TEXT_FORMAT, textToCopy, false);
+							copyDataAvaliable = true
+            	
+            }
+			private function pasteFromSystemClipborad():void
+			{
+				var text:String;
+				if (Clipboard.generalClipboard.hasFormat(ClipboardFormats.TEXT_FORMAT))
+				{
+					text=Clipboard.generalClipboard.getData(ClipboardFormats.TEXT_FORMAT) as String;
+				}
+
+				// insert the node next to the selected item
+				var startNode:Object=dgKeyword.selectedItem;
+				if (!startNode)
+				{
+					Alert.show("Specify the location");
+					return
+				}
+				else
+				{
+					var temp:XML=new XML(text)
+					for each (var step:XML in temp.KeyWord)
+					{
+						demo=demo.insertChildAfter(startNode, step)
+						dgKeyword.selectedItem=step
+//									demo.appendChild(step);	
+					}
+					modifyCaseFlag(true)
+				}
+			}
+
+
+			private function dataGridKeyDownHandler(event:KeyboardEvent):void
+			{
+				event.preventDefault();
+				
+				if(event.ctrlKey)
+				{
+					switch(String.fromCharCode(event.charCode))
+					{
+						case "c":
+							// just copy selected items into system clipboard
+							if(dgKeyword.selectedItems.length == 0)
+							{
+								Alert.show("no data selected");
+								return ;
+							}
+							setSystemClipborad();
+							break;
+							
+						case "v":
+							pasteFromSystemClipborad();
+							break;
+							
+						case "-":
+							// just copy selected items into system clipboard
+							removeStep(null)
+							break;
+							
+						case "=":
+							// just copy selected items into system clipboard
+							if(currentState == 'StateNormal'){
+								currentState='';  panelParam.title='Adding...'; myAuto.text=''; myAuto.search()
+							}else{
+								currentState='StateNormal'
+							}
+							break;
+					}
+				} 
+			}
+
+			private function dataGridKeyUpHandler(event:KeyboardEvent):void
+			{
+				if (!event.ctrlKey)
+				{
+					var textField:TextField=TextField(dgKeyword.getChildByName("clipboardProxy"));
+					if (textField)
+						dgKeyword.removeChild(textField);
+				}
+			}
+
+//			private function clipboardProxyPasteHandler(event:TextEvent):void
+//			{
+//				// Extract values from TSV format and populate the DataGrid
+//				var text:String;								
+//				if(Clipboard.generalClipboard.hasFormat(ClipboardFormats.TEXT_FORMAT)){
+// 					text = Clipboard.generalClipboard.getData(ClipboardFormats.TEXT_FORMAT) as String;
+//				}
+//
+//				var temp:XML = new XML(text)
+//				for each(var step:XML in temp.KeyWord)
+//				{
+//					demo.appendChild(step);	
+//				}
+//			}
+
+			private function getTextFromItems(items:Array):String
+			{
+				var clipXML:XML = new XML("<ClipNode/>")
+				
+				if (items.length!= 0){
+					for each (var node:XML in items){
+						clipXML.appendChild(node)
+					}	
+				}
+				return clipXML.toXMLString();
+			}
+
+
+			private function getClipStepFromText(text:String):XML
+			{
+				var clipXML:XML = new XML(text);
+				return clipXML;
+			}            
+			
+			private function onDebug(event:Event):void
+			{
+				var pname:String = ''
+				var result:String = ''
+				for each(var p:XML in keywordList..param){
+					pname = p.@name.toString()
+					var validatePtn:RegExp = /\d+$/
+					if(pname.match(validatePtn)){
+						result = result.concat(pname, " ")
+					}
+				}
+				
+				if (result == ''){
+					Alert.show("Good, all parameter name are valid");
+				}else {
+					Alert.show("Alert\n" + result);
+				}
+			}
+			
+			private function onCloseNewTestCaseWindow(event:Event):void
+            {
+            	PopUpManager.removePopUp(newCaseDiag)
+            	
+            	// start handle new test case event
+            	
+            	if(newCaseDiag.idStr == '')
+            	{
+            		// user click 'close' button, so do nothing
+            		return ;
+            	}else
+            	{
+            		confirmModified();
+            		// create a new test case
+            		demo = new XML("<TestCase/>");
+            		demo.@definedid = newCaseDiag.idStr;
+            		
+            		// new a node in treefile
+            		var definedID:String = newCaseDiag.idStr
+            		var tblFilename:String = rootFolder.concat(File.separator, definedID, '.tbl')
+					var datFilename:String = rootFolder.concat(File.separator, definedID, '.dat')
+            		var fileStream:FileStream = new FileStream();
+            		
+            		xml2TblAndDat(demo);
+            		
+            		fileStream.open(new File(tblFilename), FileMode.WRITE);
+            		fileStream.writeUTFBytes(tblContent);
+            		fileStream.close()
+            		
+            		// write dat
+	        		fileStream.open(new File(datFilename), FileMode.WRITE);
+	        		fileStream.writeUTFBytes(datContent);
+	        		fileStream.close();
+	        		
+	        		tree.refresh()
+	        		var currentIdx:int = tree.findIndex(tblFilename);
+	        		tree.scrollToIndex(currentIdx)
+	        		tree.selectedIndex = currentIdx
+            	}
+            }
+			
+			private function newTestCase():void
+			{
+            	newCaseDiag.addEventListener(CloseEvent.CLOSE, onCloseNewTestCaseWindow)
+            	newCaseDiag.addEventListener(Event.CANCEL, onCloseNewTestCaseWindow)
+            	PopUpManager.addPopUp(newCaseDiag,this,true)
+            	PopUpManager.centerPopUp(newCaseDiag)				
+			}
+			
+			private function treeItemRender():void
+			{
+				var contextMenu:ContextMenu = new ContextMenu();
+				var menuItems:Array = [];
+				var edit:ContextMenuItem = new ContextMenuItem("Edit Name");
+				edit.addEventListener(ContextMenuEvent.MENU_ITEM_SELECT, databases_menuItemSelectHandler);
+				menuItems.push(edit);
+				contextMenu.customItems = menuItems;
+				this.contextMenu = contextMenu;
+			}
+			
+			private function databases_menuItemSelectHandler(event:ContextMenuEvent):void {
+				trace("menu item selected: ");
+				
+				// delete the case
+				var id:String  = demo.@definedid.toString()
+//				lastModifiedCase = demo.copy()
+				var alertStr:String = "Do you want to delte test case "
+				alertStr =  alertStr.concat('[', id, ']?')
+				toBeDeleteID = id;
+				Alert.show(alertStr,"Warning",Alert.YES|Alert.NO, this,confirmCaseDelete,null,Alert.OK);
+			}
+			
+			public function confirmCaseDelete(eventObj:CloseEvent):void
+			{
+			   if(eventObj.detail==Alert.YES)
+			   {				   	
+			       // good, delete current test case from demo 
+			       deleteTestCase(toBeDeleteID)			       
+			       // 
+			   }
+			   else if(eventObj.detail==Alert.NO)
+			   {
+			   		// discard modification
+			   }						
+			   else if(eventObj.detail==Alert.CANCEL)
+			   {
+			       // don't change case handler
+			   }
+			}
+			
+			private function deleteTestCase(definedID:String):void
+			{
+				// new a node in treefile
+            		
+            		var tblFilename:String = rootFolder.concat(File.separator, definedID, '.tbl')
+					var datFilename:String = rootFolder.concat(File.separator, definedID, '.dat')
+					
+					trace(tblFilename)
+					trace(datFilename)
+            		
+            		var tblFile:File = new File(tblFilename);
+            		var datFile:File = new File(datFilename);
+            		
+            		tblFile.deleteFile();
+            		datFile.deleteFile();
+	        		
+	        		tree.refresh()	
+	        		
+	        		info.text = definedID.concat(" deleted...");
+			}
+			
+			
+			
+			private function addContextMenu(event:ListEvent):void
+			{
+				TreeItemRenderer(event.itemRenderer).contextMenu = mm;
+			}
+		]]>
+	</mx:Script>
+	
+		<mx:transitions>
+		<mx:Transition>
+			<mx:Parallel target="{panelParam}">
+				<mx:Fade/>
+				<mx:Resize/>
+			</mx:Parallel>
+		</mx:Transition>
+	</mx:transitions>
+	
+	<mx:Parallel  id="myFade">
+                <mx:Resize/>    
+                <mx:Fade/>
+                <mx:Dissolve/>
+            </mx:Parallel>
+
+	
+	<mx:HBox width="100%"
+			 verticalAlign="middle"
+			 addedEffect="{myFade}"
+			 removedEffect="{myFade}"
+			 horizontalGap="8" id="hboxOption">
+		<mx:TextInput id="testRoot" editable="false" enabled="true" text="{rootFolder}" height="20"/>
+		<mx:Button label="Set test root..." click="setTestRoot(event)"/>
+		<mx:LinkButton label="" toolTip="refresh test root folder" icon="@Embed('assets/arrow_refresh.png')" click="tree.refresh()"
+             fontWeight="normal"  id="linkbutton1"/>
+		<mx:VRule width="4" height="18"/>
+		
+		<mx:TextInput id="tiCaseXMLFolder" editable="false" enabled="true" text="{caseXMLFolder}" height="20"/>
+		<mx:Button id="btnsetCaseFolder" label="Set case folder..." labelPlacement="left" click="setXMLCaseFolder(event)"/>
+		<mx:LinkButton label="" toolTip="reload test case in case folder" icon="@Embed('assets/arrow_refresh.png')" click="loadTestCase(event)"
+             fontWeight="normal"  id="linkbutton2"/>
+		<mx:VRule width="4" height="18"/>
+		
+		<mx:Label text="Keyword location" textAlign="center"/>
+		<mx:TextInput id="textInputURL" text="{keywordURL}" editable="true" height="20"/>
+		<mx:Label id="keywordStatus" textAlign="center" color="0x3380DD"/>
+		<mx:LinkButton label="" toolTip="reload keyword list" icon="@Embed('assets/arrow_refresh.png')" click="useHttpService(null)"
+             fontWeight="normal"  id="linkbutton3"/>
+		<!--
+        <mx:ComboBox visible="false" id="comboBox" toolTip="{comboBox.selectedItem.data.nativePath}">
+                <mx:dataProvider>
+                    <mx:Object label="FileSystemTree.COMPUTER"
+                            data="{FileSystemTree.COMPUTER}" />
+                    <mx:Object label="File.applicationDirectory"
+                            data="{File.applicationDirectory}" />
+                    <mx:Object label="File.applicationStorageDirectory"
+                            data="{File.applicationStorageDirectory}" />
+                    <mx:Object label="File.desktopDirectory"
+                            data="{File.desktopDirectory}" />
+                    <mx:Object label="File.documentsDirectory"
+                            data="{File.documentsDirectory}" />
+                    <mx:Object label="File.userDirectory"
+                            data="{File.userDirectory}" />
+                </mx:dataProvider>
+            </mx:ComboBox>
+          -->
+
+	</mx:HBox>
+
+	<mx:HDividedBox width="100%"
+					height="100%">
+		<mx:VBox height="100%" width="30%">
+			<mx:ToggleButtonBar dataProvider="viewstack1">
+			</mx:ToggleButtonBar>
+			
+			<mx:ViewStack id="viewstack1"
+						  width="100%"
+						  height="100%">
+				<mx:Canvas label="Test Suite"
+						   width="100%"
+						   height="100%">
+					<mx:VBox height="100%"
+							 width="100%"
+							 verticalAlign="middle"
+							 x="0"
+							 y="0">
+						<mx:FileSystemTree id="tree"
+										   width="100%"
+										   height="100%"
+										   directory="{directory}"
+										   change="changeHandler(event)"
+										   horizontalScrollPolicy="on"
+										   itemRollOver="addContextMenu(event)"										   
+										   filterFunction="xmlFilterFunc"/>
+					</mx:VBox>
+				</mx:Canvas>
+				<mx:Canvas label="Test Case" width="100%" height="100%">
+					<mx:VBox x="0"
+							 y="0"
+							 height="100%"
+							 width="100%">
+						<mx:Tree width="100%"
+								 height="100%" dataProvider="{caseList.folder}" labelField="@name" 
+								 id="treeCase" iconFunction="treeCase_iconFunc"  
+								 allowMultipleSelection="true" enabled="true" change="treeCasechangeEvtHandler(event);"
+								 dragComplete="treeDragCompleteHandler(event)" >
+						</mx:Tree>
+						<mx:HBox width="100%">
+							
+							<mx:Spacer width="50%"/>
+							<mx:Button id="btnReloadCase" icon="@Embed('assets/arrow_refresh.png')" label="Reload" labelPlacement="left" click="loadTestCase(event)"/>
+							
+						</mx:HBox>
+					</mx:VBox>
+				</mx:Canvas>
+				<mx:Canvas label="keyword"
+						   width="100%"
+						   height="100%">
+					<mx:VBox x="0"
+							 y="0"
+							 height="100%"
+							 width="100%">
+						<mx:Tree width="100%"
+								 height="100%" dataProvider="{keywordList.module}" labelField="@name" 
+								 id="treeKeyword"  dragEnabled="true" dragMoveEnabled="false" 
+								 allowMultipleSelection="true" enabled="true" change="changeEvt(event);"
+								 iconFunction="treeKeyword_iconFunc"								  
+								 dragComplete="treeDragCompleteHandler(event)">
+						</mx:Tree>
+						<mx:HBox width="100%">
+							<mx:Spacer width="50%"/>
+							<mx:Button id="btnReload" icon="@Embed('assets/arrow_refresh.png')"  label="Reload" labelPlacement="left" click="useHttpService(null)"/>
+							
+						</mx:HBox>
+					</mx:VBox>
+				</mx:Canvas>
+			</mx:ViewStack>
+		</mx:VBox>
+
+		<mx:VDividedBox verticalGap="8"
+						height="100%"
+						width="100%"
+						verticalAlign="middle">
+				<mx:Canvas height="250"
+						width="100%">
+						
+					<mx:VBox width="100%" height="250">
+							
+						<mx:Panel width="100%" height="200" layout="vertical" id="panelInfo" title="Basic Information: {demo.@definedid.toString()}">
+				<mx:Label text="Defined ID: {demo.@definedid}" width="100%"/>
+				<mx:Label text="{demo.Title}" width="100%"/>				
+				<mx:HTML width="100%" height="100%" id="desc"  
+					htmlText="-{demo.Desc}" 
+					fontFamily="Arial" fontSize="8"/>
+				
+			</mx:Panel>
+			<mx:HBox width="100%" height="28" verticalAlign="middle">
+				<mx:Button label="+ Step" toolTip="insert a new step" icon="@Embed('assets/add.png')" click="currentState='';  panelParam.title='Adding...'; myAuto.text=''; myAuto.search() "/>
+				<mx:Button label="- Step" toolTip="remove selected steps" icon="@Embed('assets/delete.png')" click="removeStep(event)"/>
+				<!--
+				<mx:Button label="Preview XML" click="previewButtonClickHandler(event)"/>
+				-->
+				<mx:PopUpButton toolTip="preview" id="popBtnPreview" icon="@Embed('assets/eye.png')"
+								label="Preview"
+								width="135"
+								creationComplete="initPreviewMenu();"/>
+
+				<mx:Button label="Save Test Case" icon="@Embed('assets/save.png')" click="saveCasehandler(event)" enabled="{caseModified}"/>
+				<mx:Button label="Copy" toolTip="press Ctrl+c" icon="@Embed('assets/page_copy.png')" click="setSystemClipborad()" visible="true" enabled="{dgKeyword.selectedItems.length != 0}"/>
+				<mx:Button label="Paste" toolTip="press Ctrl+v" icon="@Embed('assets/page_white_paste.png')" click="pasteFromSystemClipborad()" visible="true" enabled="{copyDataAvaliable}"/>
+				<mx:Button label="debug" click="onDebug(event)" visible="false"/>
+				<mx:Button label="+ window" click="newStepButtonClickHandler(event)" visible="false"/>
+			</mx:HBox>	
+						</mx:VBox>
+						
+						
+						
+						</mx:Canvas>
+						
+			
+			
+
+			
+			<mx:Panel width="100%" height="200" layout="vertical" id="panelParam">
+				
+				<mx:HBox width="100%" verticalAlign="middle">
+					<mx:Label text="Keyword:"/>
+					<components:AutoComplete id="myAuto" labelField="name" width="100%" matchType="anyPart"
+						 change="AutoComplete_onSelectChange(event)"/>
+				</mx:HBox>
+				<mx:DataGrid id="dgParam" editable="true" height="100%" width="100%">
+					<mx:columns>
+					<mx:DataGridColumn dataField="name"
+									   headerText="Parameter"
+									   sortable="false"
+									   editable="false" />
+					<mx:DataGridColumn dataField="value"
+									   headerText="Value"
+									   sortable="false"
+									   editable="true"/>
+				</mx:columns>
+			
+				
+				</mx:DataGrid>
+				<mx:HBox width="100%">
+					<mx:Button id="btnSaveStep" label="Ok" click="saveStep();"/>
+					<mx:Button label="Cancel" labelPlacement="left" click="currentState='StateNormal'; dgKeyword.enabled=true"/>
+				</mx:HBox>
+				
+		</mx:Panel>		
+			
+			
+			
+		<mx:Panel width="100%" height="100%" title="Test Case Steps:">
+		<mx:DataGrid id="dgKeyword"
+						 dataProvider="{demo.KeyWord}"
+						 dragEnabled="true"
+						 dropEnabled="true"
+						 dragMoveEnabled="true"
+						 dragEnter="dragEnterHandler(event)"
+						 dragDrop="dragDropHandler(event)"
+						 sortableColumns="false"
+						 doubleClickEnabled="true"
+						 doubleClick="editCurrentStep(event)" 
+						 itemClick="onChangekeywordDataGrid(event)"
+						 allowMultipleSelection="true"
+						 keyDown="dataGridKeyDownHandler(event)"
+       					 keyUp="dataGridKeyUpHandler(event)"
+						 width="100%"
+						 height="100%">
+				<mx:columns>
+					<mx:DataGridColumn dataField="@keyname"
+									   headerText="Keyword"/>
+					<mx:DataGridColumn dataField="root"
+									   headerText="Parameter"
+									   labelFunction="getParamList" editable="true"/>
+				</mx:columns>
+
+			</mx:DataGrid>
+		</mx:Panel>
+			
+			<mx:Panel width="100%" height="90" layout="vertical" id="panelStatus" title="Basic Information:">
+				<mx:TextArea width="100%"
+							 height="100%"
+							 x="2"
+							 y="2"
+							 id="info"
+							 />
+			</mx:Panel>
+		</mx:VDividedBox>
+
+
+	</mx:HDividedBox>
+	<mx:ApplicationControlBar width="100%" height="29" dock="true" id="applicationcontrolbar1">
+	<!--
+		<mx:LinkButton label="Option" color="0x3380DD" click="{Alert.show('LinkButton Pressed');}"
+             textDecoration="underline" fontWeight="normal" icon="@Embed('assets/connect.png')" />
+             
+        <mx:LinkButton label="Disable" color="0x3380DD" click="{Alert.show('LinkButton Pressed');}"
+             textDecoration="underline" fontWeight="normal" icon="@Embed('assets/connect.png')" />
+     -->
+     	<mx:LinkButton label="New case" icon="@Embed('assets/page_white_cup.png')"  click="{newTestCase()}" enabled="{viewstack1.selectedIndex == 0}"
+             fontWeight="normal" />
+             
+
+             
+        <mx:LinkButton label="Hide option" id="linkButtonToggleOption" click="toggleOptionBox(event)"
+             fontWeight="normal" icon="@Embed('assets/cog.png')" toolTip="Click to toogle option bar" />
+        <mx:Spacer width="100%"/>     
+		<mx:LinkButton label="About" click="{Alert.show('About Message')}"
+             fontWeight="normal" />
+         
+        <!--    
+		<mx:MenuBar id="myMenuBar" labelField="@label">
+            <mx:XMLList>
+                <menuitem label="Setting" >
+                    <menuitem label="Test root..." />
+                    <menuitem label="Keyword service" />
+                </menuitem>
+                <menuitem label="Statistic"/>
+                <menuitem label="About"/>
+            </mx:XMLList>
+            
+        
+            <mx:XMLList>
+                <menuitem label="MenuItem A" >
+                    <menuitem label="SubMenuItem A-1" type="check"/>
+                    <menuitem label="SubMenuItem A-2" type="check"/>
+                </menuitem>
+                <menuitem label="MenuItem B"/>
+                <menuitem label="MenuItem C"/>
+                <menuitem label="MenuItem D" >
+                    <menuitem label="SubMenuItem D-1" type="radio" groupName="one"/>
+                    <menuitem label="SubMenuItem D-2" type="radio" groupName="one"/>
+                    <menuitem label="SubMenuItem D-3" type="radio" groupName="one"/>
+                </menuitem>
+            </mx:XMLList>
+        
+            
+        </mx:MenuBar>
+      -->
+        
+	</mx:ApplicationControlBar>
+	
+	<mx:ApplicationControlBar width="100%" height="29" id="statusAppBar" horizontalAlign="right" verticalAlign="middle">
+		<mx:Label text="CopyRight©KevinYoung.IMSS" id="label1" width="200" textAlign="left"/>
+		<mx:Spacer width="100%"/>
+		<mx:Label id="lblAppVersion" textAlign="center" color="0x3380DD"/>
+		<mx:VRule width="4" height="18"/>
+		<mx:Label text="Keyword Service Status:" textAlign="center" />
+		<mx:Image scaleContent="false" id="imgKeywordStatus" source="@Embed('assets/disconnect.png')"/>
+		<!--
+		<mx:LinkButton label="Sync with Server" id="linkbutton1"/>
+		-->
+	</mx:ApplicationControlBar>
+</mx:WindowedApplication>

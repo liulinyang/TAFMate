@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+				xmlns:components="com.hillelcoren.components.*"
+				layout="absolute"
+				width="420"
+				height="134"
+				title="New test case..." creationComplete="onInit()"
+				showCloseButton="true" cornerRadius="10">
+				<mx:Metadata>
+					[Event(name='cancel', type="flash.events.Event")]
+				</mx:Metadata>
+
+
+<mx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			
+
+			[Bindable]
+			public  var idStr:String = ''
+			
+			private function onInit():void
+			{
+				tiID.setFocus()
+			}
+			
+			private function saveTestCase():void
+			{
+				if (tiID.text == '')
+				{
+					Alert.show("definedID is not allow to be null");
+					return
+				}else{
+					idStr = tiID.text
+					dispatchEvent(new Event('cancel'));	
+				}
+			}
+		]]>
+</mx:Script>
+
+	<mx:Label text="Defined ID:" x="32" y="35"/>
+	<mx:TextInput id="tiID" x="130" y="33" text="{idStr}"/>
+	<mx:Button label="OK" click="saveTestCase()" x="325" y="33"/>
+
+</mx:TitleWindow>
+

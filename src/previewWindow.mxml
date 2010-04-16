@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+				layout="vertical"
+				width="800"
+				height="600"
+				showCloseButton="true"
+				showEffect="Glow"
+				title="Preview..."
+				addedEffect="myDis">
+
+	<mx:Dissolve id="myDis">
+	</mx:Dissolve>
+
+
+
+	<mx:Fade id="myfade">
+	</mx:Fade>
+	<mx:Glow id="myGlow">
+	</mx:Glow>
+
+	<mx:Metadata>
+					[Event(name='cancel', type="flash.events.Event")]
+				</mx:Metadata>
+
+
+
+	<mx:Script>
+		<![CDATA[
+			[Bindable]
+			public var previewData:String=""
+		]]>
+	</mx:Script>
+
+	<mx:TextArea id="previewBox"
+				 text="{previewData}"
+				 editable="false"
+				 width="100%"
+				 height="100%"/>
+	<mx:HBox width="100%">
+		<mx:Spacer width="100%"/>
+		<mx:Button label="OK"
+				   click="dispatchEvent(new Event('cancel'));"/>
+		<mx:Spacer width="100%"/>
+	</mx:HBox>
+
+
+
+</mx:TitleWindow>

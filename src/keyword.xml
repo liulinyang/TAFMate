@@ -1,0 +1,15 @@
+<module name='policy'>
+	<keyword name='startService'>	
+		<param name='servicename' default='' desc="xxx"/>	
+		<param name='timeout' default='80' desc="xxx"/>
+	</keyword>
+	<keyword name='stop'>	
+		<param name='servicename' default='' desc="xxx"/>	
+		<param name='timeout' default='80' desc="xxx"/>
+	</keyword>
+	<keyword name='whatever'>	
+		<param name='servicename' default='' desc="xxx"/>	
+		<param name='timeout' default='80' desc="xxx"/>
+	</keyword>
+	
+</module>

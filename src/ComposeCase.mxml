@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+				xmlns:components="com.hillelcoren.components.*"
+				layout="vertical"
+				width="578"
+				height="440"
+				title="Composing..."
+				showCloseButton="true">
+				<mx:Metadata>
+					[Event(name='cancel', type="flash.events.Event")]
+				</mx:Metadata>
+
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+
+			[Bindable]
+			private var _data:ArrayCollection=new ArrayCollection(["one", "two", "three"]);
+		]]>
+	</mx:Script>
+
+	<components:AutoComplete dataProvider="{ _data }"/>
+	<mx:Button label="Button" click="dispatchEvent(new Event('cancel'));"/>
+
+</mx:TitleWindow>
