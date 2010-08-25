@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectDescription>
+	<name>TAFMate</name>
+	<comment></comment>
+	<projects>
+	</projects>
+	<buildSpec>
+		<buildCommand>
+			<name>com.adobe.flexbuilder.project.flexbuilder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+		<buildCommand>
+			<name>com.adobe.flexbuilder.apollo.apollobuilder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+	</buildSpec>
+	<natures>
+		<nature>com.adobe.flexbuilder.apollo.apollonature</nature>
+		<nature>com.adobe.flexbuilder.project.flexnature</nature>
+		<nature>com.adobe.flexbuilder.project.actionscriptnature</nature>
+	</natures>
+	<linkedResources>
+		<link>
+			<name>[source path] src</name>
+			<type>2</type>
+			<location>E:/rainbow/autocomplete_flex/AdvancedAutoComplete/src</location>
+		</link>
+		<link>
+			<name>updater_cnlabfs</name>
+			<type>2</type>
+			<location>//10.204.16.2/Home/IMSS/Kevin/Automate</location>
+		</link>
+		<link>
+			<name>updater</name>
+			<type>2</type>
+			<location>E:/rails/demo/RailsApplication/public/updater</location>
+		</link>
+	</linkedResources>
+</projectDescription>
